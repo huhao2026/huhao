@@ -1,0 +1,38 @@
+name: Daily WeChat Reminder Push
+
+# 每天北京时间10点执行 (UTC时间2点)
+on:
+  schedule:
+    - cron: '0 2 * * *'  # UTC 02:00 = 北京时间 10:00
+  workflow_dispatch:  # 支持手动触发测试
+
+jobs:
+  push-reminder:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install requests
+
+      - name: Run daily reminder pusher
+        env:
+          WECHAT_WEBHOOK_KEY: ${{ secrets.WECHAT_WEBHOOK_KEY }}
+        run: |
+          python .claude/skills/wechat-notify/scripts/github_actions_pusher.py
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: push-logs
+          path: .claude/skills/wechat-notify/logs/
+          retention-days: 7

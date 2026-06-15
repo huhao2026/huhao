@@ -1,0 +1,38 @@
+{
+  "robots": [
+    {
+      "name": "重点发布单提醒群",
+      "webhook_key": "53decfbc-3071-4a15-b576-c1378591858e",
+      "description": "四川卫宁重点发布单提醒通知群",
+      "enabled": true
+    }
+  ],
+  "default_robot": "重点发布单提醒群",
+  "message_settings": {
+    "default_type": "markdown",
+    "auto_mention_responsible": true,
+    "include_summary": true,
+    "max_content_length": 4096
+  },
+  "schedule_settings": {
+    "enabled": true,
+    "check_time": "10:00",
+    "reminder_days": [1, 3, 7]
+  },
+  "notification_rules": {
+    "overdue_threshold": {
+      "urgent": 7,
+      "important": 3,
+      "attention": 1
+    },
+    "expiring_threshold": {
+      "attention": 3,
+      "notice": 7
+    }
+  },
+  "api_config": {
+    "base_url": "https://qyapi.weixin.qq.com/cgi-bin/webhook/send",
+    "timeout": 10,
+    "retry_count": 3
+  }
+}

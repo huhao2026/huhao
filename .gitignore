@@ -1,0 +1,24 @@
+# 排除本地运行产生的文件
+.api_data/
+.wincode-uploads/
+*.xlsx
+*.csv
+mcp-tools-map.json
+
+# 排除本地日志和临时文件
+.claude/skills/wechat-notify/logs/
+.claude/skills/wechat-notify/scripts/daily_reminder_pusher.py
+.claude/skills/wechat-notify/scripts/run_daily_push.bat
+.claude/skills/wechat-notify/scripts/wechat_notify.py
+.claude/skills/wechat-notify/config/daily_push_task.xml
+
+# 排除本地分析报告
+*.md
+
+# 排除settings
+.claude/settings.json
+
+# 保留必要文件
+!.github/
+!.claude/skills/wechat-notify/scripts/github_actions_pusher.py
+!.claude/skills/wechat-notify/config.json
