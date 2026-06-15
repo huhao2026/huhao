@@ -129,18 +129,30 @@ def main():
     print(f"北京时间: {(datetime.now() + __import__('datetime').timedelta(hours=8)).strftime('%Y-%m-%d %H:%M:%S')}")
     print("-" * 50)
 
+    # 调试：打印环境变量状态
+    webhook_key = os.environ.get('WECHAT_WEBHOOK_KEY', '')
+    print(f"WECHAT_WEBHOOK_KEY 长度: {len(webhook_key) if webhook_key else 0}")
+    print(f"WECHAT_WEBHOOK_KEY 是否存在: {'是' if webhook_key else '否'}")
+    print("-" * 50)
+
     pusher = GitHubActionsPusher()
 
     if not pusher.webhook_key:
         print("错误: 请在 GitHub Secrets 中配置 WECHAT_WEBHOOK_KEY")
+        print("提示: Settings -> Secrets and variables -> Actions -> New repository secret")
         return {"errcode": -1, "errmsg": "未配置Secrets"}
+
+    print(f"使用 Webhook Key: {pusher.webhook_key[:8]}...{pusher.webhook_key[-4:]}")
+    print("-" * 50)
 
     result = pusher.push_daily_reminder()
 
     if result.get('errcode') == 0:
         print("推送成功！")
+        print(f"返回结果: {json.dumps(result, indent=2)}")
     else:
         print(f"推送失败: {result.get('errmsg', '未知错误')}")
+        print(f"返回结果: {json.dumps(result, indent=2)}")
 
     print("=" * 50)
     return result
