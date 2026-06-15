@@ -2,30 +2,40 @@
 # -*- coding: utf-8 -*-
 """
 GitHub Actions 版本的每日提醒推送脚本
-适配GitHub Actions环境运行
+适配GitHub Actions环境运行，支持多群推送
 """
 
 import json
 import requests
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 
 class GitHubActionsPusher:
-    """GitHub Actions 推送器"""
+    """GitHub Actions 推送器（支持多群）"""
 
     def __init__(self):
         """初始化"""
-        # 从环境变量获取Webhook Key
-        self.webhook_key = os.environ.get('WECHAT_WEBHOOK_KEY', '')
+        # 从环境变量获取Webhook Keys（支持逗号分隔多个）
+        webhook_keys_str = os.environ.get('WECHAT_WEBHOOK_KEY', '')
+        self.webhook_keys = self._parse_webhook_keys(webhook_keys_str)
         self.today = datetime.now()
 
-    def send_wechat_message(self, content: str) -> dict:
-        """发送企业微信消息"""
-        if not self.webhook_key:
-            print("错误: 未配置 WECHAT_WEBHOOK_KEY 环境变量")
-            return {"errcode": -1, "errmsg": "未配置Webhook Key"}
+    def _parse_webhook_keys(self, keys_str: str) -> list:
+        """解析Webhook Keys（支持逗号分隔）"""
+        if not keys_str:
+            return []
 
-        url = f"https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key={self.webhook_key}"
+        # 支持逗号分隔多个Key
+        keys = [k.strip() for k in keys_str.split(',') if k.strip()]
+        return keys
+
+    def send_wechat_message(self, content: str, webhook_key: str) -> dict:
+        """发送企业微信消息到指定群"""
+        if not webhook_key:
+            print("错误: Webhook Key为空")
+            return {"errcode": -1, "errmsg": "Webhook Key为空"}
+
+        url = f"https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key={webhook_key}"
         headers = {'Content-Type': 'application/json'}
 
         message = {
@@ -44,8 +54,6 @@ class GitHubActionsPusher:
 
     def build_daily_report(self) -> str:
         """构建每日提醒报告"""
-        # 获取北京时间 (UTC+8)
-        from datetime import timedelta
         beijing_time = self.today + timedelta(hours=8)
         date_str = beijing_time.strftime("%Y-%m-%d")
         time_str = beijing_time.strftime("%H:%M")
@@ -92,7 +100,7 @@ class GitHubActionsPusher:
 
         return content
 
-    def save_log(self, result: dict):
+    def save_log(self, results: list):
         """保存执行日志"""
         log_dir = ".claude/skills/wechat-notify/logs"
         os.makedirs(log_dir, exist_ok=True)
@@ -102,7 +110,8 @@ class GitHubActionsPusher:
         log_entry = {
             "timestamp": self.today.strftime("%Y-%m-%d %H:%M:%S"),
             "timezone": "UTC",
-            "result": result
+            "total_groups": len(self.webhook_keys),
+            "results": results
         }
 
         with open(log_file, 'w', encoding='utf-8') as f:
@@ -110,52 +119,66 @@ class GitHubActionsPusher:
 
         print(f"日志已保存: {log_file}")
 
-    def push_daily_reminder(self) -> dict:
-        """推送每日提醒"""
+    def push_daily_reminder(self) -> list:
+        """推送每日提醒到所有群"""
         content = self.build_daily_report()
-        result = self.send_wechat_message(content)
+        results = []
 
-        self.save_log(result)
+        for i, webhook_key in enumerate(self.webhook_keys):
+            print(f"正在推送到第 {i+1} 个群...")
+            result = self.send_wechat_message(content, webhook_key)
+            result['group_index'] = i + 1
+            result['webhook_key_preview'] = f"{webhook_key[:8]}...{webhook_key[-4:]}"
+            results.append(result)
 
-        return result
+            if result.get('errcode') == 0:
+                print(f"  第 {i+1} 个群推送成功")
+            else:
+                print(f"  第 {i+1} 个群推送失败: {result.get('errmsg', '未知错误')}")
+
+        self.save_log(results)
+        return results
 
 
 def main():
     """主函数"""
     print("=" * 50)
-    print("GitHub Actions - 每日提醒推送")
+    print("GitHub Actions - 每日提醒推送（多群版）")
     print("=" * 50)
     print(f"UTC时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    print(f"北京时间: {(datetime.now() + __import__('datetime').timedelta(hours=8)).strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"北京时间: {(datetime.now() + timedelta(hours=8)).strftime('%Y-%m-%d %H:%M:%S')}")
     print("-" * 50)
 
     # 调试：打印环境变量状态
-    webhook_key = os.environ.get('WECHAT_WEBHOOK_KEY', '')
-    print(f"WECHAT_WEBHOOK_KEY 长度: {len(webhook_key) if webhook_key else 0}")
-    print(f"WECHAT_WEBHOOK_KEY 是否存在: {'是' if webhook_key else '否'}")
-    print("-" * 50)
+    webhook_keys_str = os.environ.get('WECHAT_WEBHOOK_KEY', '')
+    print(f"WECHAT_WEBHOOK_KEY 原始长度: {len(webhook_keys_str) if webhook_keys_str else 0}")
+    print(f"WECHAT_WEBHOOK_KEY 是否存在: {'是' if webhook_keys_str else '否'}")
 
     pusher = GitHubActionsPusher()
+    print(f"解析到 {len(pusher.webhook_keys)} 个Webhook Key")
 
-    if not pusher.webhook_key:
-        print("错误: 请在 GitHub Secrets 中配置 WECHAT_WEBHOOK_KEY")
-        print("提示: Settings -> Secrets and variables -> Actions -> New repository secret")
-        return {"errcode": -1, "errmsg": "未配置Secrets"}
+    for i, key in enumerate(pusher.webhook_keys):
+        print(f"  Key {i+1}: {key[:8]}...{key[-4:]}")
 
-    print(f"使用 Webhook Key: {pusher.webhook_key[:8]}...{pusher.webhook_key[-4:]}")
     print("-" * 50)
 
-    result = pusher.push_daily_reminder()
+    if not pusher.webhook_keys:
+        print("错误: 请在 GitHub Secrets 中配置 WECHAT_WEBHOOK_KEY")
+        print("提示: 多群推送时，多个Key用逗号分隔")
+        print("示例: key1,key2,key3")
+        return {"errcode": -1, "errmsg": "未配置Secrets"}
 
-    if result.get('errcode') == 0:
-        print("推送成功！")
-        print(f"返回结果: {json.dumps(result, indent=2)}")
-    else:
-        print(f"推送失败: {result.get('errmsg', '未知错误')}")
-        print(f"返回结果: {json.dumps(result, indent=2)}")
+    results = pusher.push_daily_reminder()
 
+    # 统计结果
+    success_count = sum(1 for r in results if r.get('errcode') == 0)
+    fail_count = len(results) - success_count
+
+    print("-" * 50)
+    print(f"推送完成: 成功 {success_count} 个群, 失败 {fail_count} 个群")
     print("=" * 50)
-    return result
+
+    return {"success": success_count, "failed": fail_count, "results": results}
 
 
 if __name__ == "__main__":
