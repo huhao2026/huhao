@@ -24,7 +24,7 @@
   },
   "schedule_settings": {
     "enabled": true,
-    "check_time": "09:00",
+    "check_time": "10:00",
     "reminder_days": [1, 3, 7]
   },
   "notification_rules": {
